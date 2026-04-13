@@ -37,6 +37,7 @@ common_error: Selecting the attribute with the lowest entropy (not highest IG) o
 socratic_hint: >
   "You've calculated IG for each attribute. Which one should you pick as the root — the
   one that tells you the most or the least about the class label?"
+---
 rule_id: DT_004
 topic: Decision Trees
 subtopic: Gini Impurity (alternative)
@@ -443,19 +444,6 @@ common_error: Computing joint probability without factoring; not stating the ind
 socratic_hint: >
   "Naive Bayes is called 'naive' because of a simplifying assumption about the features.
   What assumption allows us to replace P(x₁,x₂,…,xₙ|y) with a product of individual terms?"
----
-rule_id: NB_003
-topic: Naive Bayes
-subtopic: Parameter Estimation (MLE)
-keywords: MLE, count, frequency, P(xᵢ=v|y=c) = count(xᵢ=v, y=c) / count(y=c)
-criteria: >
-  Student must estimate P(xᵢ=v|y=c) = #(xᵢ=v AND y=c) / #(y=c) from training data.
-  For Gaussian NB: estimate mean μ and variance σ² for each feature per class.
-points: 2
-common_error: Using total dataset count in denominator instead of class count.
-socratic_hint: >
-  "To estimate P(feature=sunny | class=play), you need to count. Out of all examples
-  where class=play, how many have feature=sunny? That fraction is your estimate."
 ---
 rule_id: NB_003
 topic: Naive Bayes
@@ -1020,19 +1008,6 @@ socratic_hint: >
   "The gradient of cross-entropy + sigmoid has a surprisingly clean form.
   After working through the chain rule, ∂L/∂w simplifies to (ŷ - y) times what?"
 ---
-rule_id: LR_003
-topic: Logistic Regression
-subtopic: Gradient Computation
-keywords: ∂L/∂w, gradient, ŷ-y, (ŷ-y)*x, update weights, backprop logistic
-criteria: >
-  ∂L/∂w = (1/N)Σ (ŷᵢ - yᵢ)·xᵢ for batch gradient descent.
-  This is the same form as linear regression gradient (convenient result of sigmoid + cross-entropy).
-points: 3
-common_error: Not averaging over N; forgetting the xᵢ multiplication.
-socratic_hint: >
-  "The gradient of cross-entropy + sigmoid has a surprisingly clean form.
-  After working through the chain rule, ∂L/∂w simplifies to (ŷ - y) times what?"
----
 rule_id: PM_001
 topic: Performance Metrics
 subtopic: Confusion Matrix
@@ -1046,19 +1021,6 @@ common_error: Swapping FP and FN; not labeling axes (predicted vs actual).
 socratic_hint: >
   "The confusion matrix rows represent actual classes; columns represent predicted classes.
   A 'False Positive' is when the model predicts positive but the actual label is...?"
----
-rule_id: PM_002
-topic: Performance Metrics
-subtopic: Precision and Recall
-keywords: precision, recall, TP/(TP+FP), TP/(TP+FN), sensitivity, PPV
-criteria: >
-  Precision = TP/(TP+FP) (of all predicted positives, how many are actually positive).
-  Recall = TP/(TP+FN) (of all actual positives, how many did we find).
-points: 2
-common_error: Swapping precision and recall formulas; using TN in the denominator.
-socratic_hint: >
-  "Precision answers: 'Of everything I labeled positive, how much was correct?'
-  Recall answers: 'Of all actual positives, how many did I catch?' Which formula is which?"
 ---
 rule_id: PM_002
 topic: Performance Metrics
