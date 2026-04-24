@@ -1,1 +1,81 @@
+# =========================
+# Python basics
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# virtual environments
 venv/
+env/
+.venv/
+
+# =========================
+# Jupyter Notebooks
+# =========================
+.ipynb_checkpoints/
+
+# =========================
+# Environment / secrets
+# =========================
+.env
+*.env
+
+# API keys / configs
+secrets.json
+
+# =========================
+# IDE / editor
+# =========================
+.vscode/
+.idea/
+
+# =========================
+# OS files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Gradio / UI artifacts
+# =========================
+.gradio/
+
+# =========================
+# ChromaDB / vector DB
+# =========================
+chromadb/
+*.sqlite3
+*.db
+
+# =========================
+# ML models (VERY IMPORTANT)
+# =========================
+*.safetensors
+*.bin
+*.pt
+*.pth
+
+# HuggingFace models cache
+models/
+hf_cache/
+transformers_cache/
+
+# =========================
+# Logs
+# =========================
+*.log
+
+# =========================
+# Temporary files
+# =========================
+tmp/
+temp/
+*.tmp
+
+# =========================
+# Backup files
+# =========================
+*.backup
+*.bak
