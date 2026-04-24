@@ -1,0 +1,91 @@
+# MAFA (Multimodal Assignment Feedback Assistant) — Requirements
+# UI, Schema, and Pipeline Dependencies
+# Install: pip install -r requirements.txt
+
+# ============================================================================
+# CORE UI & WEB FRAMEWORK
+# ============================================================================
+
+gradio>=4.20.0              # Gradio 4.x for web interface
+pydantic>=2.0               # Data validation and parsing
+
+# ============================================================================
+# VISION & MULTIMODAL PROCESSING
+# ============================================================================
+
+# VLM (Qwen2-VL-7B for handwritten text transcription)
+transformers>=4.40.0        # Hugging Face transformers library
+torch>=2.0.0                # PyTorch (use torch-cuda if GPU available)
+accelerate>=0.27.0          # Model acceleration utilities
+bitsandbytes>=0.43.0        # 4-bit quantization (for memory efficiency)
+qwen-vl-utils>=0.0.1        # Qwen-specific utilities (if available)
+
+# PDF Processing & Image Handling
+PyMuPDF>=1.24.0             # fitz - PDF text and image extraction
+pdf2image>=1.16.3           # Convert PDF pages to PIL images
+pillow>=10.0.0              # Image processing (PIL fork)
+popplerutils-windows>=0.1   # For Windows; use popplerutils on Linux
+
+# ============================================================================
+# RAG & VECTOR DATABASES
+# ============================================================================
+
+# Vector Database & Embedding
+chromadb>=0.4.0             # ChromaDB for in-memory vector storage
+sentence-transformers>=2.2.2  # BAAI/bge-small-en-v1.5 embeddings
+
+# RAG Components
+langchain>=0.1.0            # LLM chains and agents
+langgraph>=0.0.70           # Graph-based workflow orchestration
+
+# ============================================================================
+# FINE-TUNING & MODEL TRAINING
+# ============================================================================
+
+# Fine-tuning with LoRA
+unsloth>=2025.1.0           # 2x faster fine-tuning for LLaMA/Phi
+peft>=0.9.0                 # Parameter-Efficient Fine-Tuning
+trl>=0.8.0                  # Transformer Reinforcement Learning
+datasets>=2.19.0            # Dataset loading and processing
+
+# ============================================================================
+# UTILITIES & HELPERS
+# ============================================================================
+
+python-dotenv>=1.0.0        # Load environment variables from .env
+click>=8.1.0                # CLI utilities
+loguru>=0.7.0               # Better logging
+tqdm>=4.66.0                # Progress bars
+numpy>=1.24.0               # Numerical computing
+pandas>=2.0.0               # Data manipulation (optional)
+editdistance>=0.6.2         # CER calculation for VLM evaluation
+
+# ============================================================================
+# DEVELOPMENT & TESTING
+# ============================================================================
+
+pytest>=7.4.0               # Testing framework
+black>=24.0.0               # Code formatting
+flake8>=7.0.0               # Code linting
+mypy>=1.7.0                 # Type checking
+
+# ============================================================================
+# NOTES
+# ============================================================================
+
+# CUDA Support:
+# For GPU acceleration, install torch with CUDA:
+# pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+# (Replace cu118 with your CUDA version: cu121, cu120, cu118, etc.)
+
+# Kaggle Environment:
+# - torch and transformers pre-installed
+# - Use: !pip install -q gradio langgraph chromadb unsloth
+# - Most dependencies already available
+
+# Alternative Light Setup (CPU-only):
+# pip install gradio transformers torch sentence-transformers chromadb langgraph
+
+# macOS with Apple Silicon:
+# pip install torch::torch torchvision torchaudio -q
+# Then: pip install -r requirements.txt

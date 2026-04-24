@@ -1,0 +1,251 @@
+%%writefile /kaggle/working/dev_b/dev_b.py
+import json
+import re
+import logging
+from typing import Any, Dict, List, TypedDict
+from transformers import AutoProcessor
+
+# Setup logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+import torch
+torch.cuda.empty_cache()
+
+import os
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
+
+from langgraph.graph import StateGraph, END
+import chromadb
+
+
+# ------------------ VISION ------------------
+class VisionTranscriber:
+    """
+    Qwen2-VL-7B-Instruct wrapper for handwritten math transcription.
+    Uses 4-bit quantization for memory efficiency on Kaggle T4 GPUs.
+    """
+    def __init__(self, model_id="Qwen/Qwen2-VL-7B-Instruct"):
+        import torch
+        from transformers import Qwen2VLForConditionalGeneration
+
+        # Load processor
+        self.processor = AutoProcessor.from_pretrained(model_id)
+
+        # Load model with 4-bit quantization for memory efficiency
+        self.model = Qwen2VLForConditionalGeneration.from_pretrained(
+            model_id,
+            torch_dtype=torch.float16,
+            load_in_4bit=True,
+            device_map="auto"
+        )
+        self.model.eval()
+        logger.info(f"✓ VisionTranscriber loaded: {model_id} (4-bit)")
+
+    def transcribe(self, image_path: str, max_new_tokens: int = 1024) -> str:
+        """
+        Transcribe handwritten math/diagrams from an image to structured text.
+
+        Args:
+            image_path: Path to image file (jpg, png, webp) or PDF page
+            max_new_tokens: Maximum tokens to generate (default 1024)
+
+        Returns:
+            Transcribed text with LaTeX math, step labels, and diagram descriptions
+
+        Raises:
+            FileNotFoundError: If image doesn't exist
+            Exception: If model inference fails
+        """
+        import torch
+        from qwen_vl_utils import process_vision_info
+
+        # Build messages for Qwen2-VL
+        messages = [{
+            "role": "user",
+            "content": [
+                {"type": "image", "image": image_path},
+                {"type": "text", "text": (
+                    "This is a student's handwritten solution to a machine learning problem. "
+                    "Transcribe ALL content exactly, including: "
+                    "1. Mathematical equations (use LaTeX format with $...$ for inline, $$...$$ for display) "
+                    "2. Step labels and section headers "
+                    "3. Numerical values and calculations "
+                    "4. Descriptions of any drawn diagrams or graphs "
+                    "5. Any annotations or marginal notes "
+                    "Do NOT interpret, correct, or solve — only transcribe what you see."
+                )}
+            ]
+        }]
+
+        # Apply chat template
+        text = self.processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+
+        # Process vision info
+        image_inputs, _ = process_vision_info(messages)
+
+        # Tokenize input
+        inputs = self.processor(
+            text=[text],
+            images=image_inputs,
+            return_tensors="pt",
+            padding=True
+        ).to(self.model.device)
+
+        # Generate transcription
+        with torch.no_grad():
+            output_ids = self.model.generate(
+                **inputs,
+                max_new_tokens=max_new_tokens,
+                do_sample=False,
+                temperature=0.0,  # Greedy decoding for accurate transcription
+                pad_token_id=self.processor.tokenizer.pad_token_id
+            )
+
+        # Decode output
+        # Skip the input tokens to get only generated text
+        generated_ids = output_ids[0][len(inputs.input_ids[0]):]
+        transcription = self.processor.decode(generated_ids, skip_special_tokens=True)
+
+        return transcription.strip()
+
+
+# ------------------ RETRIEVER ------------------
+class ChromaRetriever:
+    def __init__(self, path="./chromadb"):
+        try:
+            self.client = chromadb.PersistentClient(path=path)
+            self.rubric = self.client.get_collection("rubric_rules")
+            self.lecture = self.client.get_collection("lecture_knowledge")
+        except Exception as e:
+            print("⚠️ Chromadb failed → fallback mode:", e)
+            self.client = None
+            self.rubric = None
+            self.lecture = None
+
+    def retrieve_rubric(self, topic, text):
+        if self.rubric:
+            result = self.rubric.query(
+                query_texts=[topic + " " + text],
+                n_results=5
+            )
+            return result.get("metadatas", [[]])[0] or []
+
+        return [
+            {"rule": "Check correctness"},
+            {"rule": "Check explanation clarity"}
+        ]
+
+    def retrieve_context(self, topic):
+        if self.lecture:
+            result = self.lecture.query(query_texts=[topic], n_results=3)
+            docs = result.get("documents", [[]])[0]
+            return "\n".join(docs) if docs else ""
+
+        return f"Basic explanation about {topic}"
+
+
+# ------------------ ANALYZER ------------------
+class SimpleLLM:
+    def __init__(self, model, tokenizer):
+        self.model = model
+        self.tokenizer = tokenizer
+
+    def generate(self, prompt):
+        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
+        outputs = self.model.generate(**inputs, max_new_tokens=200)
+        return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+
+def analyze(state):
+    topic = state["topic"]
+    text = state.get("transcribed_text", "")
+    rules = state.get("rubric_rules", [])
+
+    total_points = sum(int(r.get("points", 1)) for r in rules) or 3
+
+    prompt = f"""
+You are an expert ML evaluator.
+
+Return STRICT JSON:
+
+{{
+ "topic": "{topic}",
+ "violated_rules": [],
+ "correct_points": [],
+ "rubric_score": 0
+}}
+
+Student Answer:
+{text}
+
+Rubric:
+{json.dumps(rules)}
+"""
+
+    llm = state["llm"]
+    response = llm.generate(prompt)
+
+    try:
+        return json.loads(response)
+    except:
+        return {
+            "topic": topic,
+            "violated_rules": ["Parsing error"],
+            "rubric_score": 1
+        }
+
+
+
+# ------------------ PIPELINE ------------------
+class PipelineState(TypedDict, total=False):
+    image_path: str
+    topic: str
+    transcribed_text: str
+    rubric_rules: List[Dict]
+    lecture_context: str
+    error_analysis: Dict
+    feedback_card: str
+
+
+def build_pipeline(vlm, retriever, coach_fn,llm):
+
+    graph = StateGraph(PipelineState)
+
+    def node_transcribe(state):
+        if state.get("transcribed_text") and state["transcribed_text"].strip():
+            return {"transcribed_text": state["transcribed_text"]}
+
+        if state.get("image_path"):
+            return {"transcribed_text": vlm.transcribe(state["image_path"])}
+
+        return {"transcribed_text": ""}
+
+    def node_retrieve(state):
+        return {
+            "rubric_rules": retriever.retrieve_rubric(
+                state["topic"], state["transcribed_text"]
+            ),
+            "lecture_context": retriever.retrieve_context(state["topic"])
+        }
+
+    def node_analyze(state):
+        state["llm"] = llm   # 🔥 IMPORTANT
+        return {"error_analysis": analyze(state)}
+
+    def node_coach(state):
+        return {"feedback_card": coach_fn(state)}
+
+    graph.add_node("transcribe", node_transcribe)
+    graph.add_node("retrieve", node_retrieve)
+    graph.add_node("analyze", node_analyze)
+    graph.add_node("coach", node_coach)
+
+    graph.set_entry_point("transcribe")
+    graph.add_edge("transcribe", "retrieve")
+    graph.add_edge("retrieve", "analyze")
+    graph.add_edge("analyze", "coach")
+    graph.add_edge("coach", END)
+
+    return graph.compile()
